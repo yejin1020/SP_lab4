@@ -10,8 +10,8 @@
 char message[BUFFER_SIZE];
 int message_flag = -1;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-//pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
-//pthread_mutex_t server_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t server_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t broad_to_client = PTHREAD_COND_INITIALIZER;
 pthread_cond_t request_to_server = PTHREAD_COND_INITIALIZER;
 
@@ -24,24 +24,26 @@ void request_message(int arg){
 
 	printf("client[%d] request message %s \n",arg,message);
 	message_flag += 1;
- 	
-	pthread_cond_signal(&request_to_server);
+	
+	// 서버에게 방송 요청을 한다.
+ 	pthread_cond_signal(&request_to_server);
 }
 
 
 
 void *server(void *arg)
 {
-	//while(1){
-		pthread_mutex_lock(&mutex);	
+	while(1){
+		//pthread_mutex_lock(&server_mutex);	
 
 		pthread_cond_wait(&request_to_server, &mutex);
-
+		
+		// 클라인언트에게 방송을 한다
 		pthread_cond_broadcast(&broad_to_client);
-		message_flag = 0;
+		message_flag = -1;
 
-		pthread_mutex_unlock(&mutex);	
-	//}
+		pthread_mutex_unlock(&server_mutex);	
+	}
 
 }
 
@@ -50,17 +52,19 @@ void *client(void *arg){
 	int status;
 	int num = *(int *)arg;
 	
-	//while(1){
-		pthread_mutex_lock(&mutex);
-	
-		request_message(num);
-
+	while(1){
+		pthread_mutex_lock(&client_mutex);
+		
+		if( message_flag < 0)
+			request_message(num);
+		
+		// 방송을 기다린다.
 		pthread_cond_wait(&broad_to_client, &mutex);
 			
-		printf("client[%d] receive broadcast: \n",num);
+		printf("client[%d] receive broadcast: %s \n",num,message);
 		
-		pthread_mutex_unlock(&mutex);	
-	//}
+		pthread_mutex_unlock(&client_mutex);
+	}
 }
 	
 
